@@ -1,4 +1,4 @@
-package freecache
+package redis
 
 import (
 	"context"
