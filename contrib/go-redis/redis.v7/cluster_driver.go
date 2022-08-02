@@ -7,20 +7,20 @@ import (
 	"github.com/go-redis/redis/v7"
 )
 
-type cluster struct {
+type clusterDriver struct {
 	cache   *redis.ClusterClient
 	options *Options
 }
 
-func (c *cluster) Del(ctx context.Context, key string) error {
+func (c *clusterDriver) Del(ctx context.Context, key string) error {
 	return c.cache.WithContext(ctx).Del(key).Err()
 }
 
-func (c *cluster) Get(ctx context.Context, key string) (data []byte, err error) {
+func (c *clusterDriver) Get(ctx context.Context, key string) (data []byte, err error) {
 	return c.cache.WithContext(ctx).Get(key).Bytes()
 }
 
-func (c *cluster) Set(ctx context.Context, key string, data []byte) (err error) {
+func (c *clusterDriver) Set(ctx context.Context, key string, data []byte) (err error) {
 
 	c.cache.WithContext(ctx).Del(key)
 
@@ -32,5 +32,5 @@ func (c *cluster) Set(ctx context.Context, key string, data []byte) (err error) 
 }
 
 func NewCluster(cache *redis.ClusterClient, options *Options) cache.Driver {
-	return &cluster{cache: cache, options: options}
+	return &clusterDriver{cache: cache, options: options}
 }
