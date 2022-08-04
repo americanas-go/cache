@@ -3,8 +3,7 @@ module github.com/americanas-go/cache
 go 1.18
 
 require (
-	github.com/allegro/bigcache v1.2.1
-	github.com/americanas-go/log v1.8.5
+	github.com/allegro/bigcache/v3 v3.0.2
 	github.com/coocood/freecache v1.2.1
 	github.com/go-redis/redis/v7 v7.4.1
 	github.com/go-redis/redis/v8 v8.11.5
