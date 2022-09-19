@@ -8,6 +8,13 @@ func SaveEmpty() func(opt *Option) {
 	}
 }
 
+func AsyncSave() func(opt *Option) {
+	return func(opt *Option) {
+		opt.AsyncSave = true
+	}
+}
+
 type Option struct {
 	SaveEmpty bool
+	AsyncSave bool
 }

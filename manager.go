@@ -38,6 +38,7 @@ func (m *Manager[T]) Save(ctx context.Context, key string, data T, opts ...Optio
 
 	opt := Option{
 		SaveEmpty: false,
+		AsyncSave: false,
 	}
 
 	for _, o := range opts {
@@ -54,9 +55,18 @@ func (m *Manager[T]) Save(ctx context.Context, key string, data T, opts ...Optio
 	b := buf.Bytes()
 
 	if len(b) > 0 || opt.SaveEmpty {
-		err = m.driver.Set(ctx, key, b)
-		if err != nil {
-			return err
+
+		if opt.AsyncSave {
+
+			go func(ctx context.Context, key string, b []byte) {
+				m.driver.Set(ctx, key, b)
+			}(ctx, key, b)
+
+		} else {
+			err = m.driver.Set(ctx, key, b)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
