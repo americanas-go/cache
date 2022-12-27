@@ -14,9 +14,9 @@ func AsyncSave() func(opt *Option) {
 	}
 }
 
-func Replicate() func(opt *Option) {
+func WithoutReplicate() func(opt *Option) {
 	return func(opt *Option) {
-		opt.Replicate = true
+		opt.Replicate = false
 	}
 }
 
