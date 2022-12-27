@@ -10,6 +10,7 @@ type Manager[T any] struct {
 	drivers []Driver
 	mids    []Middleware[T]
 	codec   Codec[T]
+	metric  *Metric
 	name    string
 }
 
@@ -56,14 +57,13 @@ func (m *Manager[T]) Get(ctx context.Context, key string) (ok bool, data T, err 
 }
 
 func (m *Manager[T]) Set(ctx context.Context, key string, data T, opts ...OptionSet) (err error) {
-
 	var b []byte
 
 	if b, err = m.codec.Encode(data); err != nil {
 		return err
 	}
 
-	return m.set(ctx, len(m.drivers), key, b, opts...)
+	return m.set(ctx, len(m.drivers)-1, key, b, opts...)
 }
 
 func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []byte, opts ...OptionSet) (err error) {
@@ -84,7 +84,7 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 
 			go func(ctx context.Context, key string, b []byte) {
 				for i, d := range m.drivers {
-					if opt.Replicate && i < driveIndex {
+					if (opt.Replicate && i < driveIndex) || len(m.drivers)-1 == driveIndex {
 						c := m.newContext(ctx, d)
 						if err := c.Set(key, b); err != nil {
 							log.Error(err.Error())
@@ -94,8 +94,9 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 			}(ctx, key, b)
 
 		} else {
+
 			for i, d := range m.drivers {
-				if opt.Replicate && i < driveIndex {
+				if (opt.Replicate && i < driveIndex) || len(m.drivers)-1 == driveIndex {
 					c := m.newContext(ctx, d)
 					if err = c.Set(key, b); err != nil {
 						return err
