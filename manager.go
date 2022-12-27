@@ -84,7 +84,7 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 
 			go func(ctx context.Context, key string, b []byte) {
 				for i, d := range m.drivers {
-					if (opt.Replicate && i < driveIndex) || len(m.drivers)-1 == driveIndex {
+					if m.isReplicable(opt, i, driveIndex) {
 						c := m.newContext(ctx, d)
 						if err := c.Set(key, b); err != nil {
 							log.Error(err.Error())
@@ -96,7 +96,7 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 		} else {
 
 			for i, d := range m.drivers {
-				if (opt.Replicate && i < driveIndex) || len(m.drivers)-1 == driveIndex {
+				if m.isReplicable(opt, i, driveIndex) {
 					c := m.newContext(ctx, d)
 					if err = c.Set(key, b); err != nil {
 						return err
@@ -107,6 +107,10 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 	}
 
 	return nil
+}
+
+func (m *Manager[T]) isReplicable(opt Option, i int, driveIndex int) bool {
+	return (opt.Replicate && i < driveIndex) || len(m.drivers)-1 == driveIndex
 }
 
 func (m *Manager[T]) GetOrSet(ctx context.Context, key string, cacheable Cacheable[T], opts ...OptionSet) (data T, err error) {
