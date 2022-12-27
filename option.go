@@ -14,7 +14,14 @@ func AsyncSave() func(opt *Option) {
 	}
 }
 
+func Replicate() func(opt *Option) {
+	return func(opt *Option) {
+		opt.Replicate = true
+	}
+}
+
 type Option struct {
 	SaveEmpty bool
 	AsyncSave bool
+	Replicate bool
 }

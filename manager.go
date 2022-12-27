@@ -8,13 +8,22 @@ import (
 
 type Manager[T any] struct {
 	drivers []Driver
+	mids    []Middleware[T]
 	codec   Codec[T]
 	name    string
 }
 
+func (m *Manager[T]) newContext(ctx context.Context, driver Driver) *Context[T] {
+	c := NewContext[T](m.name, driver, m.mids...)
+	c.SetContext(ctx)
+	return c
+}
+
 func (m *Manager[T]) Del(ctx context.Context, key string) error {
+
 	for _, d := range m.drivers {
-		if err := d.Del(ctx, key); err != nil {
+		c := m.newContext(ctx, d)
+		if err := c.Del(key); err != nil {
 			return err
 		}
 	}
@@ -26,7 +35,8 @@ func (m *Manager[T]) Get(ctx context.Context, key string) (ok bool, data T, err 
 	var b []byte
 
 	for _, d := range m.drivers {
-		b, err = d.Get(ctx, key)
+		c := m.newContext(ctx, d)
+		b, err = c.Get(key)
 		if err != nil {
 			return false, data, err
 		}
@@ -61,6 +71,7 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 	opt := Option{
 		SaveEmpty: false,
 		AsyncSave: false,
+		Replicate: true,
 	}
 
 	for _, o := range opts {
@@ -73,8 +84,9 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 
 			go func(ctx context.Context, key string, b []byte) {
 				for i, d := range m.drivers {
-					if i < driveIndex {
-						if err := d.Set(ctx, key, b); err != nil {
+					if opt.Replicate && i < driveIndex {
+						c := m.newContext(ctx, d)
+						if err := c.Set(key, b); err != nil {
 							log.Error(err.Error())
 						}
 					}
@@ -83,9 +95,9 @@ func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []by
 
 		} else {
 			for i, d := range m.drivers {
-				if i < driveIndex {
-					err = d.Set(ctx, key, b)
-					if err != nil {
+				if opt.Replicate && i < driveIndex {
+					c := m.newContext(ctx, d)
+					if err = c.Set(key, b); err != nil {
 						return err
 					}
 				}
@@ -102,7 +114,8 @@ func (m *Manager[T]) GetOrSet(ctx context.Context, key string, cacheable Cacheab
 	var index int
 
 	for i, d := range m.drivers {
-		b, err = d.Get(ctx, key)
+		c := m.newContext(ctx, d)
+		b, err = c.Get(key)
 		if err != nil {
 			return data, err
 		}
@@ -138,12 +151,10 @@ func (m *Manager[T]) GetOrSet(ctx context.Context, key string, cacheable Cacheab
 	return data, err
 }
 
-/*
-func (m *Manager[T]) UseDriver(d Driver) *Manager[T] {
-	m.drivers = append(m.drivers, d)
+func (m *Manager[T]) Use(mid Middleware[T]) *Manager[T] {
+	m.mids = append(m.mids, mid)
 	return m
 }
-*/
 
 func NewManager[T any](name string, c Codec[T], d ...Driver) *Manager[T] {
 	return &Manager[T]{name: name, codec: c, drivers: d}
