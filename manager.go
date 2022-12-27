@@ -1,31 +1,42 @@
 package cache
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
+
+	"github.com/americanas-go/log"
 )
 
 type Manager[T any] struct {
-	driver Driver
+	drivers []Driver
+	codec   Codec[T]
+	name    string
+}
+
+func (m *Manager[T]) Del(ctx context.Context, key string) error {
+	for _, d := range m.drivers {
+		if err := d.Del(ctx, key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Manager[T]) Get(ctx context.Context, key string) (ok bool, data T, err error) {
 
 	var b []byte
-	b, err = m.driver.Get(ctx, key)
-	if err != nil {
-		if err.Error() == "Entry not found" {
-			return false, data, nil
+
+	for _, d := range m.drivers {
+		b, err = d.Get(ctx, key)
+		if err != nil {
+			return false, data, err
 		}
-		return false, data, err
+		if len(b) > 0 {
+			break
+		}
 	}
 
 	if len(b) > 0 {
-		var buf bytes.Buffer
-		dec := gob.NewDecoder(&buf)
-		buf.Write(b)
-		if err = dec.Decode(&data); err != nil {
+		if err = m.codec.Decode(b, &data); err != nil {
 			return false, data, err
 		}
 		return true, data, err
@@ -34,7 +45,18 @@ func (m *Manager[T]) Get(ctx context.Context, key string) (ok bool, data T, err 
 	return false, data, err
 }
 
-func (m *Manager[T]) Save(ctx context.Context, key string, data T, opts ...OptionSet) (err error) {
+func (m *Manager[T]) Set(ctx context.Context, key string, data T, opts ...OptionSet) (err error) {
+
+	var b []byte
+
+	if b, err = m.codec.Encode(data); err != nil {
+		return err
+	}
+
+	return m.set(ctx, len(m.drivers), key, b, opts...)
+}
+
+func (m *Manager[T]) set(ctx context.Context, driveIndex int, key string, b []byte, opts ...OptionSet) (err error) {
 
 	opt := Option{
 		SaveEmpty: false,
@@ -45,27 +67,28 @@ func (m *Manager[T]) Save(ctx context.Context, key string, data T, opts ...Optio
 		o()(&opt)
 	}
 
-	var buf bytes.Buffer
-
-	enc := gob.NewEncoder(&buf)
-	if err = enc.Encode(data); err != nil {
-		return err
-	}
-
-	b := buf.Bytes()
-
 	if len(b) > 0 || opt.SaveEmpty {
 
 		if opt.AsyncSave {
 
 			go func(ctx context.Context, key string, b []byte) {
-				m.driver.Set(ctx, key, b)
+				for i, d := range m.drivers {
+					if i < driveIndex {
+						if err := d.Set(ctx, key, b); err != nil {
+							log.Error(err.Error())
+						}
+					}
+				}
 			}(ctx, key, b)
 
 		} else {
-			err = m.driver.Set(ctx, key, b)
-			if err != nil {
-				return err
+			for i, d := range m.drivers {
+				if i < driveIndex {
+					err = d.Set(ctx, key, b)
+					if err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -73,31 +96,55 @@ func (m *Manager[T]) Save(ctx context.Context, key string, data T, opts ...Optio
 	return nil
 }
 
-func (m *Manager[T]) GetOrSave(ctx context.Context, key string, cacheable Cacheable[T], opts ...OptionSet) (data T, err error) {
+func (m *Manager[T]) GetOrSet(ctx context.Context, key string, cacheable Cacheable[T], opts ...OptionSet) (data T, err error) {
 
-	var ok bool
-	ok, data, err = m.Get(ctx, key)
-	if err != nil || ok {
-		return data, err
+	var b []byte
+	var index int
+
+	for i, d := range m.drivers {
+		b, err = d.Get(ctx, key)
+		if err != nil {
+			return data, err
+		}
+		if len(b) > 0 {
+			index = i
+		}
 	}
 
-	if !ok {
+	if len(b) > 0 {
+		if err = m.codec.Decode(b, &data); err != nil {
+			return data, err
+		}
 
+		if index > 0 {
+			err = m.set(ctx, index, key, b, opts...)
+			if err != nil {
+				return data, err
+			}
+		}
+
+	} else {
 		data, err = cacheable(ctx)
 		if err != nil {
 			return data, err
 		}
 
-		err = m.Save(ctx, key, data, opts...)
+		err = m.Set(ctx, key, data, opts...)
 		if err != nil {
 			return data, err
 		}
-
 	}
 
 	return data, err
 }
 
-func NewManager[T any](driver Driver) *Manager[T] {
-	return &Manager[T]{driver: driver}
+/*
+func (m *Manager[T]) UseDriver(d Driver) *Manager[T] {
+	m.drivers = append(m.drivers, d)
+	return m
+}
+*/
+
+func NewManager[T any](name string, c Codec[T], d ...Driver) *Manager[T] {
+	return &Manager[T]{name: name, codec: c, drivers: d}
 }

@@ -3,7 +3,6 @@ package testify
 import (
 	context "context"
 
-	"github.com/americanas-go/cache"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -63,6 +62,6 @@ func (_m *Driver) Set(ctx context.Context, key string, data []byte) error {
 	return r0
 }
 
-func New() cache.Driver {
+func New() *Driver {
 	return new(Driver)
 }
