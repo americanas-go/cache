@@ -1,4 +1,4 @@
-package gob
+package binary
 
 import (
 	"bytes"
@@ -9,9 +9,9 @@ type Codec[T any] struct {
 }
 
 func (c *Codec[T]) Encode(e T) (b []byte, err error) {
-	var buf bytes.Buffer
+	buf := new(bytes.Buffer)
 
-	if err = binary.Write(&buf, binary.LittleEndian, e); err != nil {
+	if err = binary.Write(buf, binary.LittleEndian, e); err != nil {
 		return b, err
 	}
 
@@ -21,7 +21,7 @@ func (c *Codec[T]) Encode(e T) (b []byte, err error) {
 
 func (c *Codec[T]) Decode(b []byte, data *T) (err error) {
 	buf := bytes.NewReader(b)
-	return binary.Read(buf, binary.LittleEndian, &data)
+	return binary.Read(buf, binary.BigEndian, data)
 }
 
 func New[T any]() *Codec[T] {
