@@ -23,8 +23,8 @@ func (c *Codec[T]) Encode(data T) (b []byte, err error) {
 
 func (c *Codec[T]) Decode(b []byte, data *T) (err error) {
 	var buf bytes.Buffer
-	dec := json.NewDecoder(&buf)
 	buf.Write(b)
+	dec := json.NewDecoder(&buf)
 	if err = dec.Decode(data); err != nil {
 		return err
 	}

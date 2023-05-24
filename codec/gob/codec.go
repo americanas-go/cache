@@ -22,8 +22,8 @@ func (c *Codec[T]) Encode(e T) (b []byte, err error) {
 
 func (c *Codec[T]) Decode(b []byte, data *T) (err error) {
 	var buf bytes.Buffer
-	dec := gob.NewDecoder(&buf)
 	buf.Write(b)
+	dec := gob.NewDecoder(&buf)
 	if err = dec.Decode(data); err != nil {
 		return err
 	}
