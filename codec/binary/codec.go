@@ -11,7 +11,7 @@ type Codec[T any] struct {
 func (c *Codec[T]) Encode(e T) (b []byte, err error) {
 	buf := new(bytes.Buffer)
 
-	if err = binary.Write(buf, binary.LittleEndian, e); err != nil {
+	if err = binary.Write(buf, binary.BigEndian, e); err != nil {
 		return b, err
 	}
 
